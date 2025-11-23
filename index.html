@@ -79,7 +79,12 @@
             border: 2px solid black;
             border-radius: 10px;
         }
-        
+
+        /* PC 키보드 가이드 - 모바일에서는 숨김 */
+        .pc-guide {
+            display: block; 
+        }
+
         /* 분노 게이지 컨테이너 */
         #rage-bar-container {
             position: absolute;
@@ -93,7 +98,7 @@
             border-radius: 5px;
             border: 3px solid #ff4500;
             box-shadow: 0 0 10px #ff4500;
-            display: none; /* JS에서 시작 시 'flex'로 변경됨 */
+            display: none; 
             flex-direction: column;
             align-items: center;
         }
@@ -126,13 +131,15 @@
             bottom: 10px;
             width: 100%;
             display: flex;
+            flex-direction: column;
+            gap: 10px;
             justify-content: space-between;
             align-items: flex-end;
             padding: 0 10px;
             z-index: 100;
         }
 
-        .dpad, .action-buttons {
+        .dpad, .action-buttons, .weapon-buttons {
             display: flex;
             gap: 5px;
         }
@@ -141,12 +148,21 @@
             flex-direction: column;
             align-items: center;
             width: 150px;
+            margin-right: auto;
         }
 
         .dpad-row {
             display: flex;
             gap: 5px;
         }
+
+        .action-buttons, .weapon-buttons {
+            align-self: flex-end; 
+        }
+        .weapon-buttons {
+            margin-top: -5px; 
+        }
+
 
         .ctrl-btn {
             width: 50px;
@@ -162,11 +178,19 @@
             cursor: pointer;
             box-shadow: 3px 3px 0 black;
             transition: none;
+            border-radius: 5px;
         }
         
         .ctrl-btn:active {
             box-shadow: 1px 1px 0 black;
             transform: translate(2px, 2px);
+        }
+
+        /* 무기 버튼 전용 스타일 */
+        .weapon-btn {
+            background: #aaffaa; 
+            font-size: 16px;
+            width: 65px; 
         }
 
         @media (max-width: 820px) {
@@ -178,7 +202,18 @@
             }
             .guide { font-size: 16px; }
             #mobile-controls { display: flex; }
-            #rage-bar-container { width: 90%; top: 5px; }
+            #rage-bar-container { width: 90%; top: 5px; } 
+            .pc-guide { display: none; } 
+
+            #ui-layer {
+                top: 70px; 
+                left: 10px;
+            }
+            #weapon-guide {
+                background: none; 
+                border: none; 
+                padding: 0;
+            }
         }
         @media (min-width: 821px) {
             #mobile-controls { display: none; }
@@ -237,14 +272,14 @@
 
 <div id="game-container">
     <div id="ui-layer">
-        <div class="guide">
+        <div class="guide pc-guide">
             **PC 키보드**<br>
             이동: ⬅️⬆️⬇️➡️ 방향키<br>
             대화: **E** 키<br>
             공격: **Space** 키
         </div>
         <div id="weapon-guide" class="guide" style="margin-top: 10px;">
-            무기 변경: [1] 꿀밤 | [2] 뿅망치 | [3] 서류 | [4] 옆차기
+            현재 무기: [1] 꿀밤 (Lv.1)
         </div>
     </div>
     
@@ -274,9 +309,17 @@
             </div>
         </div>
 
-        <div class="action-buttons">
-            <div class="ctrl-btn" data-key="KeyE" style="background:#4CAF50;">🗣️ Talk (E)</div>
-            <div class="ctrl-btn" data-key="Space" style="background:#F44336;">🦶 Attack (Space)</div>
+        <div>
+            <div class="weapon-buttons">
+                <div class="ctrl-btn weapon-btn" data-weapon="0">꿀밤</div>
+                <div class="ctrl-btn weapon-btn" data-weapon="1">뿅망치</div>
+                <div class="ctrl-btn weapon-btn" data-weapon="2">서류</div>
+                <div class="ctrl-btn weapon-btn" data-weapon="3">옆차기</div>
+            </div>
+            <div class="action-buttons">
+                <div class="ctrl-btn" data-key="KeyE" style="background:#4CAF50;">🗣️ Talk (E)</div>
+                <div class="ctrl-btn" data-key="Space" style="background:#F44336;">🦶 Attack (Space)</div>
+            </div>
         </div>
     </div>
     
@@ -305,7 +348,7 @@
     let currentWeapon = 0; 
     let speechPhase = 0; 
 
-    // 무기 목록
+    // 무기 목록 (reaction 텍스트만 사용)
     const weapons = [
         { name: "꿀밤 (Lv.1)", range: 30, text: "딱!", color: "#ff8c00", reaction: "크흐", damage: 20 },
         { name: "뿅망치 (Lv.2)", range: 50, text: "뿅!", color: "#00bfff", reaction: "켁!", damage: 40 },
@@ -328,16 +371,23 @@
         {x: 100, y: 100, w: 120, h: 60}, {x: 300, y: 100, w: 120, h: 60}, {x: 500, y: 100, w: 120, h: 60},
         {x: 100, y: 450, w: 120, h: 60}, {x: 300, y: 450, w: 120, h: 60},
     ];
+
+    // 상사 잔소리 (순수 텍스트 배열 - TTS로 읽힘)
     const nags = [
-        "어이~ 거기 뭐해?", "일 안 하고 돌아다녀?", "이거 폰트가 별로네.",
-        "라떼는 말이야~", "주말에 등산 갈까?", "자네, 열정이 부족해.",
-        "오늘 회식 필참이야!", "가족 같은 회사잖아 ^^"
+        "어이~ 거기 뭐해?", 
+        "라떼는 말이야~", 
+        "오늘 회식 필참이야!", 
+        "이거 폰트가 별로네.",
+        "주말에 등산 갈까?", 
+        "자네, 열정이 부족해.",
+        "가족 같은 회사잖아 ^^"
     ];
+    
     const TALK_RANGE = 150;
 
 
     // ------------------------------------------
-    // SFX/리액션 함수
+    // SFX/리액션 함수 (TTS 기반)
     // ------------------------------------------
     function playHitSound(level) {
         if (audioCtx.state === 'suspended') audioCtx.resume(); 
@@ -358,11 +408,10 @@
         oscillator.stop(audioCtx.currentTime + 0.15);
     }
     
+    // [TTS] 보스 피격 리액션 (매우 빠르고 높은 톤)
     function bossReactToHit(reactionText) {
         if (!window.speechSynthesis) return;
         window.speechSynthesis.cancel();
-        isTalking = false;
-        speechPhase = 0;
         
         const msg = new SpeechSynthesisUtterance(reactionText);
         msg.lang = 'ko-KR';
@@ -376,7 +425,7 @@
     }
 
     // ------------------------------------------
-    // 대화 로직
+    // 대화 로직 (TTS 기반)
     // ------------------------------------------
 
     function checkTalkStart() {
@@ -387,16 +436,18 @@
         const dist = Math.sqrt(dx*dx + dy*dy);
 
         if (dist < TALK_RANGE && speechPhase === 0 && !boss.isHit) {
-            window.speechSynthesis.cancel(); 
             playerSpeak();
         }
     }
 
+    // [TTS] 플레이어 대화
     function playerSpeak() {
         if (!window.speechSynthesis) return;
 
         const playerLine = "야, " + bossName + "!";
         currentNag = playerLine;
+
+        window.speechSynthesis.cancel(); 
 
         const msg = new SpeechSynthesisUtterance(playerLine);
         msg.lang = 'ko-KR';
@@ -414,10 +465,13 @@
         window.speechSynthesis.speak(msg);
     }
 
+    // [TTS] 상사 잔소리
     function bossSpeak() {
         if (!window.speechSynthesis) return;
         
         const randomNag = nags[Math.floor(Math.random() * nags.length)];
+
+        window.speechSynthesis.cancel(); 
 
         const msg = new SpeechSynthesisUtterance(randomNag);
         msg.lang = 'ko-KR';
@@ -482,7 +536,8 @@
             }
             
             playHitSound(currentWeapon + 1);
-            bossReactToHit(weapon.reaction);
+            // reaction 텍스트를 TTS 함수에 전달
+            bossReactToHit(weapon.reaction); 
 
             player.isAttacking = true;
             player.attackTimer = player.attackDuration;
@@ -523,7 +578,6 @@
     }
 
     function drawPlayer() {
-        // (드로잉 로직 생략)
         ctx.beginPath();
         ctx.strokeStyle = "black";
         ctx.lineWidth = 3;
@@ -682,7 +736,7 @@
     }
     
     // ------------------------------------------
-    // 게임 시작 함수 (오디오/컨텍스트 안정화)
+    // 게임 시작 함수 
     // ------------------------------------------
     function startGame() {
         const input = document.getElementById('bossNameInput').value;
@@ -694,7 +748,7 @@
         document.getElementById('weapon-guide').innerText = `현재 무기: [1] ${weapons[currentWeapon].name}`;
         gameRunning = true;
         
-        // [강화] 오디오 컨텍스트를 사용자 클릭 후 확실히 재개
+        // 오디오 컨텍스트를 사용자 클릭 후 확실히 재개
         if (audioCtx.state === 'suspended') {
             audioCtx.resume().catch(err => console.error("AudioContext resume failed:", err));
         }
@@ -705,6 +759,8 @@
     // ------------------------------------------
     // 키 입력 및 터치 리스너
     // ------------------------------------------
+    
+    // PC 키보드 입력
     window.addEventListener('keydown', e => {
         if (!gameRunning) return; 
 
@@ -719,8 +775,7 @@
         } 
         
         if (e.key >= '1' && e.key <= '4') {
-            currentWeapon = parseInt(e.key) - 1;
-            document.getElementById('weapon-guide').innerText = `현재 무기: [${e.key}] ${weapons[currentWeapon].name}`;
+            setWeapon(parseInt(e.key) - 1);
         }
     });
 
@@ -728,14 +783,30 @@
         keys[e.code] = false;
     });
 
+    // 무기 변경 함수
+    function setWeapon(index) {
+        if (index >= 0 && index < weapons.length) {
+            currentWeapon = index;
+            document.getElementById('weapon-guide').innerText = `현재 무기: [${index + 1}] ${weapons[currentWeapon].name}`;
+        }
+    }
+
+    // 터치 컨트롤 이벤트 핸들러
     function handleButtonStart(e) {
         e.preventDefault();
         if (!gameRunning) return;
         const key = e.currentTarget.dataset.key;
+        const weaponIndex = e.currentTarget.dataset.weapon;
+
         if (key && key !== 'NoKey') {
             keys[key] = true;
             if (key === 'KeyE') checkTalkStart();
             if (key === 'Space') attack();
+        }
+
+        // 무기 변경 버튼 처리
+        if (weaponIndex !== undefined) {
+            setWeapon(parseInt(weaponIndex));
         }
     }
 
@@ -753,6 +824,8 @@
         btn.addEventListener('mouseup', handleButtonEnd);
         btn.addEventListener('touchstart', handleButtonStart);
         btn.addEventListener('touchend', handleButtonEnd);
+        // 터치 환경에서 마우스업/다운처럼 작동하도록 touchcancel 추가
+        btn.addEventListener('touchcancel', handleButtonEnd); 
     });
 
 </script>
