@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>사표 대신 이단 옆차기</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gaegu&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #f0f0f0;
+            font-family: 'Gaegu', cursive;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px; 
+            height: 600px;
+        }
+
+        canvas {
+            display: block;
+            background: #fff;
+            border: 4px solid black;
+            box-shadow: 10px 10px 0 rgba(0,0,0,0.1);
+            border-radius: 10px;
+            width: 100%;
+            height: 100%;
+        }
+
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+            font-family: 'Gaegu', cursive;
+            text-align: center;
+            border-radius: 10px;
+        }
+        
+        #start-overlay h1 { font-size: 40px; }
+        #start-overlay input { padding: 10px; font-size: 20px; margin-bottom: 20px; border: 2px solid black; }
+        #start-overlay button { 
+            padding: 15px 30px; 
+            font-size: 24px; 
+            background: #ffeb3b; 
+            border: 2px solid black; 
+            box-shadow: 4px 4px 0 black; 
+            cursor: pointer;
+        }
+
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .guide {
+            font-size: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border: 2px solid black;
+            border-radius: 10px;
+        }
+        
+        /* 분노 게이지 컨테이너 */
+        #rage-bar-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70%;
+            z-index: 60;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+            border-radius: 5px;
+            border: 3px solid #ff4500;
+            box-shadow: 0 0 10px #ff4500;
+            display: none; /* JS에서 시작 시 'flex'로 변경됨 */
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #rage-bar-label {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 0 black;
+        }
+
+        #rage-bar {
+            height: 25px;
+            width: 100%;
+            background: #444;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        #rage-fill {
+            height: 100%;
+            width: 100%; 
+            background: linear-gradient(to right, #ff4500, #ff0000);
+            transition: width 0.3s ease-out;
+        }
+
+
+        #mobile-controls {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 10px;
+            z-index: 100;
+        }
+
+        .dpad, .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dpad {
+            flex-direction: column;
+            align-items: center;
+            width: 150px;
+        }
+
+        .dpad-row {
+            display: flex;
+            gap: 5px;
+        }
+
+        .ctrl-btn {
+            width: 50px;
+            height: 50px;
+            background: #ffeb3b;
+            border: 2px solid black;
+            font-family: 'Gaegu', cursive;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            cursor: pointer;
+            box-shadow: 3px 3px 0 black;
+            transition: none;
+        }
+        
+        .ctrl-btn:active {
+            box-shadow: 1px 1px 0 black;
+            transform: translate(2px, 2px);
+        }
+
+        @media (max-width: 820px) {
+            #game-container {
+                width: 95vw;
+                height: 95vw; 
+                max-width: 600px;
+                max-height: 600px;
+            }
+            .guide { font-size: 16px; }
+            #mobile-controls { display: flex; }
+            #rage-bar-container { width: 90%; top: 5px; }
+        }
+        @media (min-width: 821px) {
+            #mobile-controls { display: none; }
+        }
+
+        #hit-effect {
+            position: absolute;
+            font-size: 40px;
+            font-weight: bold;
+            color: red;
+            pointer-events: none;
+            text-shadow: 2px 2px 0 black;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #end-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            font-family: 'Gaegu', cursive;
+            text-align: center;
+        }
+
+        #end-screen h1 {
+            font-size: 60px;
+            color: #ffeb3b;
+            text-shadow: 4px 4px 0 #ff4500;
+            margin-bottom: 20px;
+        }
+        
+        #end-screen p {
+            font-size: 30px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="start-overlay">
+    <h1>🏃‍♀️ 사표 대신 이단 옆차기</h1>
+    <p>상사 이름을 입력하세요</p>
+    <input type="text" id="bossNameInput" value="김부장">
+    <button onclick="startGame()">출근하기 (게임 시작)</button>
+    <p style="font-size: 14px; color: #666;">* 소리 켜고 크롬 브라우저 권장 *</p>
+</div>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <div class="guide">
+            **PC 키보드**<br>
+            이동: ⬅️⬆️⬇️➡️ 방향키<br>
+            대화: **E** 키<br>
+            공격: **Space** 키
+        </div>
+        <div id="weapon-guide" class="guide" style="margin-top: 10px;">
+            무기 변경: [1] 꿀밤 | [2] 뿅망치 | [3] 서류 | [4] 옆차기
+        </div>
+    </div>
+    
+    <div id="rage-bar-container">
+        <div id="rage-bar-label">상사 분노 게이지 (HP)</div>
+        <div id="rage-bar"><div id="rage-fill"></div></div>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div id="mobile-controls">
+        <div class="dpad">
+            <div class="dpad-row">
+                <div class="ctrl-btn" data-key="ArrowUp" style="visibility:hidden;"></div>
+                <div class="ctrl-btn" data-key="ArrowUp">⬆️</div>
+                <div class="ctrl-btn" data-key="ArrowUp" style="visibility:hidden;"></div>
+            </div>
+            <div class="dpad-row">
+                <div class="ctrl-btn" data-key="ArrowLeft">⬅️</div>
+                <div class="ctrl-btn" data-key="NoKey"></div>
+                <div class="ctrl-btn" data-key="ArrowRight">➡️</div>
+            </div>
+            <div class="dpad-row">
+                <div class="ctrl-btn" data-key="ArrowDown" style="visibility:hidden;"></div>
+                <div class="ctrl-btn" data-key="ArrowDown">⬇️</div>
+                <div class="ctrl-btn" data-key="ArrowDown" style="visibility:hidden;"></div>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <div class="ctrl-btn" data-key="KeyE" style="background:#4CAF50;">🗣️ Talk (E)</div>
+            <div class="ctrl-btn" data-key="Space" style="background:#F44336;">🦶 Attack (Space)</div>
+        </div>
+    </div>
+    
+    <div id="end-screen">
+        <h1>축하합니다!</h1>
+        <p id="end-message"></p>
+        <p style="margin-top: 50px;">새로운 마음으로 다시 출근하시겠습니까?</p>
+        <button onclick="window.location.reload()" style="padding: 15px 30px; font-size: 24px; background: #ffeb3b; border: 2px solid black; box-shadow: 4px 4px 0 black; cursor: pointer;">재시작</button>
+    </div>
+</div>
+
+<div id="hit-effect"></div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const controls = document.querySelectorAll('.ctrl-btn');
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+
+    // 게임 상태
+    let gameRunning = false;
+    let bossName = "김부장";
+    let keys = {};
+    let isTalking = false; 
+    let currentNag = "...";
+    let currentWeapon = 0; 
+    let speechPhase = 0; 
+
+    // 무기 목록
+    const weapons = [
+        { name: "꿀밤 (Lv.1)", range: 30, text: "딱!", color: "#ff8c00", reaction: "크흐", damage: 20 },
+        { name: "뿅망치 (Lv.2)", range: 50, text: "뿅!", color: "#00bfff", reaction: "켁!", damage: 40 },
+        { name: "서류 뭉치 (Lv.3)", range: 100, text: "휘릭!", color: "#228b22", reaction: "악!", damage: 60 },
+        { name: "이단 옆차기 (Lv.4)", range: 120, text: "퍽!!", color: "red", reaction: "커헉!", damage: 80 }
+    ];
+
+    // 플레이어/보스/데스크 데이터
+    const player = { x: 100, y: 300, speed: 4, isAttacking: false, attackTimer: 0, attackDuration: 15 };
+    const BOSS_START_X = 600;
+    const BOSS_START_Y = 300;
+    const boss = { 
+        x: BOSS_START_X, y: BOSS_START_Y, 
+        isHit: false, hitTimer: 0, hitDuration: 15,
+        health: 1000, 
+        maxHealth: 1000,
+        isQuitting: false 
+    };
+    const desks = [
+        {x: 100, y: 100, w: 120, h: 60}, {x: 300, y: 100, w: 120, h: 60}, {x: 500, y: 100, w: 120, h: 60},
+        {x: 100, y: 450, w: 120, h: 60}, {x: 300, y: 450, w: 120, h: 60},
+    ];
+    const nags = [
+        "어이~ 거기 뭐해?", "일 안 하고 돌아다녀?", "이거 폰트가 별로네.",
+        "라떼는 말이야~", "주말에 등산 갈까?", "자네, 열정이 부족해.",
+        "오늘 회식 필참이야!", "가족 같은 회사잖아 ^^"
+    ];
+    const TALK_RANGE = 150;
+
+
+    // ------------------------------------------
+    // SFX/리액션 함수
+    // ------------------------------------------
+    function playHitSound(level) {
+        if (audioCtx.state === 'suspended') audioCtx.resume(); 
+
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        const frequency = 1600 - (level * 200); 
+
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15); 
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.15);
+    }
+    
+    function bossReactToHit(reactionText) {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        isTalking = false;
+        speechPhase = 0;
+        
+        const msg = new SpeechSynthesisUtterance(reactionText);
+        msg.lang = 'ko-KR';
+        msg.pitch = 2.0; 
+        msg.rate = 2.0;  
+        
+        msg.onstart = () => { currentNag = reactionText; };
+        msg.onend = () => { currentNag = "..."; };
+        
+        window.speechSynthesis.speak(msg);
+    }
+
+    // ------------------------------------------
+    // 대화 로직
+    // ------------------------------------------
+
+    function checkTalkStart() {
+        if (!gameRunning || boss.isQuitting) return; 
+
+        const dx = player.x - boss.x;
+        const dy = player.y - boss.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < TALK_RANGE && speechPhase === 0 && !boss.isHit) {
+            window.speechSynthesis.cancel(); 
+            playerSpeak();
+        }
+    }
+
+    function playerSpeak() {
+        if (!window.speechSynthesis) return;
+
+        const playerLine = "야, " + bossName + "!";
+        currentNag = playerLine;
+
+        const msg = new SpeechSynthesisUtterance(playerLine);
+        msg.lang = 'ko-KR';
+        msg.pitch = 1.0; 
+        msg.rate = 0.8;  
+        
+        msg.onstart = () => { 
+            isTalking = true;
+            speechPhase = 1; 
+        };
+        msg.onend = () => { 
+            bossSpeak();
+        };
+        
+        window.speechSynthesis.speak(msg);
+    }
+
+    function bossSpeak() {
+        if (!window.speechSynthesis) return;
+        
+        const randomNag = nags[Math.floor(Math.random() * nags.length)];
+
+        const msg = new SpeechSynthesisUtterance(randomNag);
+        msg.lang = 'ko-KR';
+        msg.pitch = 2.0; 
+        msg.rate = 1.3;  
+        
+        msg.onstart = () => { 
+            isTalking = true;
+            speechPhase = 2; 
+        };
+        msg.onend = () => { 
+            isTalking = false; 
+            speechPhase = 0; 
+            currentNag = "..."; 
+        };
+        
+        window.speechSynthesis.speak(msg);
+        currentNag = randomNag;
+    }
+    
+    // ------------------------------------------
+    // 분노 게이지 및 종료 로직
+    // ------------------------------------------
+
+    function updateRageBar() {
+        const percent = Math.max(0, boss.health / boss.maxHealth) * 100;
+        document.getElementById('rage-fill').style.width = percent + '%';
+    }
+
+    function endGame(status) {
+        gameRunning = false;
+        window.speechSynthesis.cancel();
+        
+        if (status === 'win') {
+            boss.isQuitting = true;
+            document.getElementById('end-message').innerText = 
+                `상사 ${bossName} 님께서 스트레스로 인해 사직서를 제출하고 퇴사하셨습니다!`;
+        }
+        
+        document.getElementById('end-screen').style.display = 'flex';
+    }
+
+
+    // ------------------------------------------
+    // 공격 로직 
+    // ------------------------------------------
+
+    function attack() {
+        if (player.isAttacking || !gameRunning || boss.isQuitting) return;
+
+        const dx = player.x - boss.x;
+        const dy = player.y - boss.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const weapon = weapons[currentWeapon];
+
+        if (dist < weapon.range) { 
+            
+            boss.health -= weapon.damage;
+            if (boss.health <= 0) {
+                endGame('win');
+                return;
+            }
+            
+            playHitSound(currentWeapon + 1);
+            bossReactToHit(weapon.reaction);
+
+            player.isAttacking = true;
+            player.attackTimer = player.attackDuration;
+            boss.isHit = true;
+            boss.hitTimer = boss.hitDuration;
+            
+            if (currentWeapon === 3) {
+                boss.x += 30; 
+            } else {
+                boss.x += 10;
+            }
+
+            const hitEffectDiv = document.getElementById('hit-effect');
+            hitEffectDiv.style.left = boss.x + 'px';
+            hitEffectDiv.style.top = boss.y - 100 + 'px';
+            hitEffectDiv.innerText = weapon.text;
+            hitEffectDiv.style.color = weapon.color;
+            hitEffectDiv.style.opacity = 1;
+
+            setTimeout(() => {
+                hitEffectDiv.style.opacity = 0;
+            }, 300);
+        }
+    }
+    
+    // ------------------------------------------
+    // 드로잉 및 게임 루프
+    // ------------------------------------------
+    
+    function drawDoodleRect(x, y, w, h, color) {
+        ctx.beginPath();
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 3;
+        ctx.rect(x, y, w, h);
+        ctx.stroke();
+        ctx.fillStyle = color + '33';
+        ctx.fillRect(x+2, y+2, w-4, h-4);
+    }
+
+    function drawPlayer() {
+        // (드로잉 로직 생략)
+        ctx.beginPath();
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 3;
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.x, player.y + 40);
+        ctx.lineTo(player.x - 10, player.y + 60);
+        ctx.moveTo(player.x, player.y + 40);
+        ctx.lineTo(player.x + 10, player.y + 60);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(player.x, player.y - 10, 15, 0, Math.PI * 2);
+        ctx.fillStyle = "white";
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(player.x - 10, player.y - 15);
+        ctx.quadraticCurveTo(player.x - 25, player.y, player.x - 15, player.y + 5);
+        ctx.stroke();
+        
+        if (player.isAttacking) {
+            ctx.strokeStyle = weapons[currentWeapon].color;
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            
+            const weapon = weapons[currentWeapon];
+            if (currentWeapon === 0 || currentWeapon === 1) { 
+                ctx.moveTo(player.x, player.y + 10);
+                ctx.lineTo(player.x + weapon.range, player.y + 5);
+                if (currentWeapon === 1) { 
+                    ctx.font = "20px Gaegu";
+                    ctx.fillStyle = weapon.color;
+                    ctx.fillText("🔨", player.x + weapon.range - 15, player.y);
+                }
+            } 
+            else if (currentWeapon === 2) { 
+                ctx.moveTo(player.x, player.y + 10);
+                ctx.lineTo(player.x + weapon.range, player.y + 5); 
+                ctx.font = "20px Gaegu";
+                ctx.fillStyle = weapon.color;
+                ctx.fillText("📄", player.x + 40, player.y);
+            }
+            else if (currentWeapon === 3) { 
+                ctx.moveTo(player.x, player.y + 30);
+                ctx.lineTo(player.x + weapon.range, player.y + 20);
+            }
+            ctx.stroke();
+        }
+    }
+
+    function drawBoss() {
+        if (boss.isQuitting) return;
+
+        let shakeX = 0;
+        if (boss.isHit) {
+            shakeX = (Math.random() - 0.5) * 10;
+        }
+
+        const bx = boss.x + shakeX;
+        const by = boss.y;
+
+        ctx.beginPath();
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 3;
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx, by + 40); 
+        ctx.lineTo(bx - 10, by + 60); 
+        ctx.moveTo(bx, by + 40);
+        ctx.lineTo(bx + 10, by + 60);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(bx, by - 10, 18, 0, Math.PI * 2); 
+        ctx.fillStyle = "#ffecd1"; 
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(bx, by - 10, 18, 0, Math.PI, false); 
+        ctx.strokeStyle = "black";
+        ctx.stroke();
+
+        ctx.fillStyle = "black";
+        ctx.font = "16px Gaegu";
+        ctx.fillText(bossName, bx - 20, by + 80);
+
+        const dx = player.x - boss.x;
+        const dy = player.y - boss.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < TALK_RANGE && !boss.isHit) {
+            
+            if (speechPhase !== 0) { 
+                ctx.beginPath();
+                ctx.fillStyle = "white";
+                ctx.strokeStyle = "black";
+                ctx.roundRect(bx - 100, by - 80, 200, 40, 10);
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.fillStyle = "black";
+                ctx.textAlign = "center";
+                ctx.font = "18px Gaegu";
+                ctx.fillText(currentNag, bx, by - 55);
+            }
+        } else {
+            if(speechPhase !== 0) {
+                window.speechSynthesis.cancel();
+                isTalking = false;
+                speechPhase = 0;
+                currentNag = "...";
+            }
+        }
+    }
+
+    function gameLoop() {
+        if (!gameRunning) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        desks.forEach(d => {
+            drawDoodleRect(d.x, d.y, d.w, d.h, "#8d6e63"); 
+            ctx.fillStyle = "black";
+            ctx.font = "14px Gaegu";
+            ctx.fillText("업무중", d.x + 20, d.y + 30);
+        });
+        
+        updateRageBar(); 
+
+        if (keys['ArrowLeft']) player.x -= player.speed;
+        if (keys['ArrowRight']) player.x += player.speed;
+        if (keys['ArrowUp']) player.y -= player.speed;
+        if (keys['ArrowDown']) player.y += player.speed;
+
+        player.x = Math.max(20, Math.min(canvas.width - 20, player.x));
+        player.y = Math.max(20, Math.min(canvas.height - 20, player.y));
+        
+        drawBoss();
+        drawPlayer();
+
+        if (player.isAttacking) {
+            player.attackTimer--;
+            if (player.attackTimer <= 0) player.isAttacking = false;
+        }
+        
+        if (boss.isHit) {
+            boss.hitTimer--;
+            if (boss.hitTimer <= 0) {
+                boss.isHit = false;
+                boss.x = BOSS_START_X; 
+                boss.y = BOSS_START_Y;
+            }
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+    
+    // ------------------------------------------
+    // 게임 시작 함수 (오디오/컨텍스트 안정화)
+    // ------------------------------------------
+    function startGame() {
+        const input = document.getElementById('bossNameInput').value;
+        if(input) bossName = input;
+        
+        document.getElementById('start-overlay').style.display = 'none';
+        document.getElementById('rage-bar-container').style.display = 'flex'; 
+
+        document.getElementById('weapon-guide').innerText = `현재 무기: [1] ${weapons[currentWeapon].name}`;
+        gameRunning = true;
+        
+        // [강화] 오디오 컨텍스트를 사용자 클릭 후 확실히 재개
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(err => console.error("AudioContext resume failed:", err));
+        }
+
+        gameLoop();
+    }
+
+    // ------------------------------------------
+    // 키 입력 및 터치 리스너
+    // ------------------------------------------
+    window.addEventListener('keydown', e => {
+        if (!gameRunning) return; 
+
+        keys[e.code] = true;
+
+        if (e.code === 'KeyE') {
+            checkTalkStart();
+        } 
+        
+        if (e.code === 'Space') { 
+            attack(); 
+        } 
+        
+        if (e.key >= '1' && e.key <= '4') {
+            currentWeapon = parseInt(e.key) - 1;
+            document.getElementById('weapon-guide').innerText = `현재 무기: [${e.key}] ${weapons[currentWeapon].name}`;
+        }
+    });
+
+    window.addEventListener('keyup', e => {
+        keys[e.code] = false;
+    });
+
+    function handleButtonStart(e) {
+        e.preventDefault();
+        if (!gameRunning) return;
+        const key = e.currentTarget.dataset.key;
+        if (key && key !== 'NoKey') {
+            keys[key] = true;
+            if (key === 'KeyE') checkTalkStart();
+            if (key === 'Space') attack();
+        }
+    }
+
+    function handleButtonEnd(e) {
+        e.preventDefault();
+        if (!gameRunning) return;
+        const key = e.currentTarget.dataset.key;
+        if (key && key !== 'NoKey') {
+            keys[key] = false;
+        }
+    }
+
+    controls.forEach(btn => {
+        btn.addEventListener('mousedown', handleButtonStart);
+        btn.addEventListener('mouseup', handleButtonEnd);
+        btn.addEventListener('touchstart', handleButtonStart);
+        btn.addEventListener('touchend', handleButtonEnd);
+    });
+
+</script>
+
+</body>
+</html>
